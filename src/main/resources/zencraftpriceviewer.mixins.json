@@ -1,0 +1,11 @@
+{
+  "required": true,
+  "package": "matyfou.zencraftpriceviewer.mixin",
+  "compatibilityLevel": "JAVA_17",
+  "client": [
+    "ScreenMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}

@@ -1,0 +1,32 @@
+{
+  "schemaVersion": 1,
+  "id": "zencraftprice",
+  "version": "${version}",
+  "name": "ZencraftPrice",
+  "description": "Permet de voir facilement le prix des items sur zencraft",
+  "authors": [
+    "Matyfou"
+  ],
+  "contact": {
+    "repo": "https://github.com/Matyfou/ZenPrice"
+  },
+  "license": "MIT",
+  "icon": "assets/icon.png",
+  "environment": "client",
+  "entrypoints": {
+    "client": [
+      "matyfou.zencraftpriceviewer.zencraftprice.client.ZencraftPriceClient"
+    ],
+    "main": [
+      "matyfou.zencraftpriceviewer.zencraftprice.ZencraftPrice"
+    ]
+  },
+  "mixins": [
+    "zencraftpriceviewer.mixins.json"
+  ],
+  "depends": {
+    "fabricloader": ">=${loader_version}",
+    "fabric": "*",
+    "minecraft": "${minecraft_version}"
+  }
+}

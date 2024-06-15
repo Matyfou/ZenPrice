@@ -1,0 +1,17 @@
+{
+  "accessWidener": "v1",
+  "entries": [
+    {
+      "abstract": false,
+      "access": "mutable",
+      "name": "title",
+      "owners": [
+        {
+          "name": "net/minecraft/client/gui/screen/ingame/GenericContainerScreen"
+        }
+      ],
+      "methods": [],
+      "fields": []
+    }
+  ]
+}
