@@ -1,0 +1,9 @@
+Si vous voulez changer de fichier .ods, faites bien attention à respecter le format :
+
+Colonne A               Colonne B
+Nom des items           Prix des items
+
+Et si en haut des colonnes il y a un titre, enlevez-le ca va éviter des problèmes
+Et évidemment, n'oubliez pas de le renommer avec le même nom
+
+Dans la config du mod, désactivez la mise à jour automatique du fichier .ods sinon ca va écraser votre fichier personnalisé

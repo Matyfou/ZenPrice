@@ -1,0 +1,6 @@
+- Menus /metiers
+*** - Arrondie au .00
+*** - Prix sur le nom de menu shulker
+*** - Uniquement sur zencraft
+- prix dans les menus
+
