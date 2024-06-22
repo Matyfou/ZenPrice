@@ -3,7 +3,9 @@ package matyfou.zencraftpriceviewer.zencraftprice;
 import com.github.miachm.sods.Range;
 import com.github.miachm.sods.Sheet;
 import com.github.miachm.sods.SpreadSheet;
-import matyfou.zencraftpriceviewer.MyConfig;
+import matyfou.zencraftpriceviewer.ZenConfig;
+import me.shedaniel.autoconfig.AutoConfig;
+import me.shedaniel.autoconfig.serializer.GsonConfigSerializer;
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.client.item.v1.ItemTooltipCallback;
 import net.fabricmc.loader.api.FabricLoader;
@@ -49,7 +51,7 @@ public class ZencraftPrice implements ModInitializer {
     public static final Logger LOGGER = LoggerFactory.getLogger("zencraftprice");
     private final Map<String, Double> itemPrices = new HashMap<>();
 
-    public static final MyConfig CONFIG = MyConfig.createAndLoad();
+    ZenConfig config;
 
     private String CONFIG_DIR = (FabricLoader.getInstance().getConfigDir() + "\\Zenprice");
     private static final String DEFAULT_EXCEL_PATH = "table_des_prix.ods";
@@ -60,7 +62,11 @@ public class ZencraftPrice implements ModInitializer {
     @Override
     public void onInitialize()
     {
-        if(CONFIG.excelAutoUpdate())
+        AutoConfig.register(ZenConfig.class, GsonConfigSerializer::new);
+
+        config = AutoConfig.getConfigHolder(ZenConfig.class).getConfig();
+
+        if(config.excelAutoUpdate)
         {
             checkAndUpdateExcelFile();
         }
@@ -80,10 +86,12 @@ public class ZencraftPrice implements ModInitializer {
         });
     }
 
-    private static final String GITHUB_EXCEL_RAW_URL = CONFIG.odsFileDownloadLink_GITHUB_EXCEL_RAW_URL();
-    private static final String GITHUB_API_URL = CONFIG.odsFileDownloadLink_GITHUB_API_URL();
+    private String GITHUB_EXCEL_RAW_URL = "https://raw.githubusercontent.com/Matyfou/ZenpriceTDP/main/table_des_prix.ods";
+    private String GITHUB_API_URL = "https://api.github.com/repos/Matyfou/ZenpriceTDP/contents/table_des_prix.ods";
 
     private void checkAndUpdateExcelFile() {
+        GITHUB_EXCEL_RAW_URL = config.odsFileDownloadLink_GITHUB_EXCEL_RAW_URL;
+        GITHUB_API_URL = config.odsFileDownloadLink_GITHUB_API_URL;
         try {
             // Vérifier si le dossier de configuration existe
             Path configDirPath = Paths.get(CONFIG_DIR);
@@ -109,7 +117,7 @@ public class ZencraftPrice implements ModInitializer {
                 // Comparer les dates de modification
                 if (githubLastModified > localLastModified || localFile == null) {
                     // Télécharger et remplacer le fichier local
-                    LOGGER.info("Mise à jour du fichier Excel depuis GitHub...");
+                    LOGGER.info("Mise a jour du fichier Excel depuis GitHub...");
 
                     URL excelUrl = new URL(GITHUB_EXCEL_RAW_URL);
                     try (InputStream in = excelUrl.openStream();
@@ -121,26 +129,26 @@ public class ZencraftPrice implements ModInitializer {
                         }
                     }
 
-                    LOGGER.info("Fichier Excel mis à jour avec succès.");
+                    LOGGER.info("Fichier Excel mis à jour avec succes.");
                 } else {
-                    LOGGER.info("Le fichier local est à jour.");
+                    LOGGER.info("Le fichier local est a jour.");
                 }
             } else {
-                LOGGER.error("La requête vers l'API GitHub a échoué avec le code : " + responseCode);
+                LOGGER.error("La requete vers l'API GitHub a echouer avec le code : " + responseCode);
                 ExcelFileGet();
             }
 
             connection.disconnect();
 
         } catch (IOException e) {
-            LOGGER.error("Erreur lors de la mise à jour du fichier Excel depuis GitHub", e);
+            LOGGER.error("Erreur lors de la mise a jour du fichier Excel depuis GitHub", e);
             ExcelFileGet();
         }
     }
 
     private void putTitles(ItemStack stack, List<Text> lines)
     {
-        if(!CONFIG.serverOnlyOption() || (CONFIG.serverOnlyOption() && isConnectedToServer("play.zencraft.fr")))
+        if(!config.serverOnlyOption || (!config.serverOnlyOption && isConnectedToServer("play.zencraft.fr")))
         {
             String itemName = toUpperCase(stack.getItem().toString());
             double itemPrice = 0;
@@ -184,12 +192,12 @@ public class ZencraftPrice implements ModInitializer {
                 // Mettre un prix si c'est DES items
                 else if(stack.getCount() > 1)
                 {
-                    lines.add(Text.of((CONFIG.priceText() + " " + itemPrice + "$" + " (" + String.format("%.2f", (stack.getCount() * itemPrice)) + "$)")));
+                    lines.add(Text.of((config.priceText + " " + itemPrice + "$" + " (" + String.format("%.2f", (stack.getCount() * itemPrice)) + "$)")));
                 }
                 // Mettre un prix si c'est UN item
                 else
                 {
-                    lines.add(Text.of((CONFIG.priceText() + " " + itemPrice + "$")));
+                    lines.add(Text.of((config.priceText + " " + itemPrice + "$")));
                 }
             }
             else
@@ -296,7 +304,7 @@ public class ZencraftPrice implements ModInitializer {
             // A CHANGER (je sais c'est de la merde ce que j'ai fais)
             if((originalText.toLowerCase().contains("chest") || (originalText.toLowerCase().contains("coffre") || (originalText.toLowerCase().contains("tonneau") || (originalText.toLowerCase().contains("barrel"))))))
             {
-                String add = " " + CONFIG.chestPriceText() +  " ";
+                String add = " " + config.chestPriceText +  " ";
 
                 double chestPrice = getContainerMenuTotal(containerScreen.getScreenHandler());
 
@@ -317,7 +325,7 @@ public class ZencraftPrice implements ModInitializer {
             String modifiedText = "?";
 
             String originalText = shulkerScreen.getTitle().getString();
-            String add = " " + CONFIG.chestPriceText() +  " ";
+            String add = " " + config.chestPriceText +  " ";
 
             double chestPrice = getContainerMenuTotal(shulkerScreen.getScreenHandler());
 
@@ -498,7 +506,7 @@ public class ZencraftPrice implements ModInitializer {
             }
 
             long fileLoadTime = System.currentTimeMillis();
-            LOGGER.info("Fichier ODS chargé avec succes en "  + (fileLoadTime - startTime) + " ms");
+            LOGGER.info("Fichier ODS charger avec succes en "  + (fileLoadTime - startTime) + " ms");
         } catch (IOException ex) {
             LOGGER.error("Erreur lors du chargement du fichier ODS", ex);
         }

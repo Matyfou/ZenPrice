@@ -19,15 +19,26 @@
     ],
     "main": [
       "matyfou.zencraftpriceviewer.zencraftprice.ZencraftPrice"
+    ],
+    "modmenu": [
+      "matyfou.zencraftpriceviewer.ModMenuIntegration"
     ]
   },
   "mixins": [
     "zencraftpriceviewer.mixins.json"
   ],
   "depends": {
-    "owo-lib": "*",
     "fabricloader": ">=${loader_version}",
     "fabric": "*",
     "minecraft": ">=${minecraft_version}"
+  },
+  "custom": {
+    "modmenu": {
+      "links": {
+        "modmenu.modrinth": "https://modrinth.com/mod/zenprice",
+        "modmenu.github": "https://github.com/Matyfou/ZenPrice"
+      },
+      "update_checker": false
+    }
   }
 }

@@ -3,18 +3,17 @@
   "zenprice.priceNotFound": "Prix non trouvé",
   "zenprice.priceNotFixed": "Cet item n'a pas de prix fixe",
 
-  "text.config.Zenprice/ZenpriceConfig.section.General": "Général",
-  "text.config.Zenprice/ZenpriceConfig.title": "Zenprice config",
+  "text.autoconfig.Zenprice/config.title": "Zenprice config",
 
-  "text.config.Zenprice/ZenpriceConfig.option.serverOnlyOption": "Uniquement activé sur Zencraft",
-  "text.config.Zenprice/ZenpriceConfig.option.serverOnlyOption.tooltip": "Activer le mod uniquement quand connecté sur Zencraft",
+  "text.autoconfig.Zenprice/config.option.serverOnlyOption": "Uniquement activé sur Zencraft",
+  "text.autoconfig.Zenprice/config.option.serverOnlyOption.@Tooltip": "Activer le mod uniquement quand connecté sur Zencraft",
 
-  "text.config.Zenprice/ZenpriceConfig.option.excelAutoUpdate": "Mise à jour automatique du fichier Excel",
-  "text.config.Zenprice/ZenpriceConfig.option.excelAutoUpdate.tooltip": "Activer la mise à jour automatique du fichier Excel (À désactiver si vous mettez un fichier Excel personnalisé)",
+  "text.autoconfig.Zenprice/config.option.excelAutoUpdate": "Mise à jour automatique du fichier Excel",
+  "text.autoconfig.Zenprice/config.option.excelAutoUpdate.@Tooltip": "Activer la mise à jour automatique du fichier Excel (À désactiver si vous mettez un fichier Excel personnalisé)",
 
-  "text.config.Zenprice/ZenpriceConfig.option.priceText": "Le texte avant le prix sous les items",
-  "text.config.Zenprice/ZenpriceConfig.option.priceText.tooltip": "Permet de modifier le texte qui est avant le prix sous les items",
+  "text.autoconfig.Zenprice/config.option.priceText": "Le texte avant le prix sous les items",
+  "text.autoconfig.Zenprice/config.option.priceText.@Tooltip": "Permet de modifier le texte qui est avant le prix sous les items",
 
-  "text.config.Zenprice/ZenpriceConfig.option.chestPriceText": "Le texte avant le prix dans le titre des coffres",
-  "text.config.Zenprice/ZenpriceConfig.option.chestPriceText.tooltip": "Permet de modifier le texte qui est avant le prix dans le titre des coffres"
+  "text.autoconfig.Zenprice/config.option.chestPriceText": "Le texte avant le prix dans le titre des coffres",
+  "text.autoconfig.Zenprice/config.option.chestPriceText.@Tooltip": "Permet de modifier le texte qui est avant le prix dans le titre des coffres"
 }

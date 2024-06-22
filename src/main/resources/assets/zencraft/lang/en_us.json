@@ -3,18 +3,19 @@
   "zenprice.priceNotFound": "Price not found",
   "zenprice.priceNotFixed": "This item does not have a fixed price",
 
-  "text.config.Zenprice/ZenpriceConfig.section.General": "General",
-  "text.config.Zenprice/ZenpriceConfig.title": "Zenprice config",
+  "text.autoconfig.Zenprice/config.title": "Zenprice config",
 
-  "text.config.Zenprice/ZenpriceConfig.option.serverOnlyOption": "Enabled only on Zencraft",
-  "text.config.Zenprice/ZenpriceConfig.option.serverOnlyOption.tooltip": "Enable the mod only when connected to Zencraft",
+  "text.autoconfig.Zenprice/config.option.serverOnlyOption": "Enabled only on Zencraft",
+  "text.autoconfig.Zenprice/config.option.serverOnlyOption.@Tooltip": "Enable the mod only when connected to Zencraft",
 
-  "text.config.Zenprice/ZenpriceConfig.option.excelAutoUpdate": "Automatic Excel file update",
-  "text.config.Zenprice/ZenpriceConfig.option.excelAutoUpdate.tooltip": "Enable automatic update of the Excel file (Disable if you use a customized Excel file)",
+  "text.autoconfig.Zenprice/config.option.excelAutoUpdate": "Automatic Excel file update",
+  "text.autoconfig.Zenprice/config.option.excelAutoUpdate.@Tooltip": "Enable automatic update of the Excel file (Disable if you use a customized Excel file)",
 
-  "text.config.Zenprice/ZenpriceConfig.option.priceText": "Text before the price under the items",
-  "text.config.Zenprice/ZenpriceConfig.option.priceText.tooltip": "Allows modifying the text that appears before the price under the items",
+  "text.autoconfig.Zenprice/config.option.priceText": "Text before the price under the items",
+  "text.autoconfig.Zenprice/config.option.priceText.@Tooltip": "Allows modifying the text that appears before the price under the items",
 
-  "text.config.Zenprice/ZenpriceConfig.option.chestPriceText": "Text before the price on the chests names",
-  "text.config.Zenprice/ZenpriceConfig.option.chestPriceText.tooltip": "Allows modifying the text that appears on the chests names"
+  "text.autoconfig.Zenprice/config.option.chestPriceText": "Text before the price on the chests names",
+  "text.autoconfig.Zenprice/config.option.chestPriceText.@Tooltip": "Allows modifying the text that appears on the chests names",
+
+  "modmenu.github": "Github"
 }
