@@ -3,12 +3,16 @@ package matyfou.zencraftpriceviewer.zencraftprice;
 import com.github.miachm.sods.Range;
 import com.github.miachm.sods.Sheet;
 import com.github.miachm.sods.SpreadSheet;
+
 import matyfou.zencraftpriceviewer.ZenConfig;
+
 import me.shedaniel.autoconfig.AutoConfig;
 import me.shedaniel.autoconfig.serializer.GsonConfigSerializer;
+
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.client.item.v1.ItemTooltipCallback;
 import net.fabricmc.loader.api.FabricLoader;
+
 import net.minecraft.block.ShulkerBoxBlock;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.screen.ingame.ShulkerBoxScreen;
@@ -30,6 +34,7 @@ import net.minecraft.screen.slot.Slot;
 import net.minecraft.text.Text;
 import net.minecraft.util.Identifier;
 import net.minecraft.util.collection.DefaultedList;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -66,6 +71,11 @@ public class ZencraftPrice implements ModInitializer {
 
         config = AutoConfig.getConfigHolder(ZenConfig.class).getConfig();
 
+        if(FabricLoader.getInstance().isModLoaded("zenclient"))
+        {
+            LOGGER.info("Zenlauncher detecter !");
+        }
+
         if(config.excelAutoUpdate)
         {
             checkAndUpdateExcelFile();
@@ -78,13 +88,20 @@ public class ZencraftPrice implements ModInitializer {
         loadPricesFromOds(CONFIG_EXCEL_PATH);
 
         ItemTooltipCallback.EVENT.register((stack, context, lines) -> {
-            putTitles(stack, lines);
+            if(!config.serverOnlyOption || isConnectedToServer("play.zencraft.fr"))
+            {
+                putTitles(stack, lines);
+            }
         });
 
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
-            setChestName(client);
+            if(!config.serverOnlyOption || isConnectedToServer("play.zencraft.fr"))
+            {
+                setChestName(client);
+            }
         });
     }
+
 
     private String GITHUB_EXCEL_RAW_URL = "https://raw.githubusercontent.com/Matyfou/ZenpriceTDP/main/table_des_prix.ods";
     private String GITHUB_API_URL = "https://api.github.com/repos/Matyfou/ZenpriceTDP/contents/table_des_prix.ods";
@@ -148,8 +165,6 @@ public class ZencraftPrice implements ModInitializer {
 
     private void putTitles(ItemStack stack, List<Text> lines)
     {
-        if(!config.serverOnlyOption || (!config.serverOnlyOption && isConnectedToServer("play.zencraft.fr")))
-        {
             String itemName = toUpperCase(stack.getItem().toString());
             double itemPrice = 0;
             totalPrice = 0;
@@ -204,7 +219,6 @@ public class ZencraftPrice implements ModInitializer {
             {
                 lines.add(Text.translatable("zenprice.priceNotFound"));
             }
-        }
     }
 
     private double getEnchantementsPrice(ItemStack stack)
@@ -281,8 +295,15 @@ public class ZencraftPrice implements ModInitializer {
             if (networkHandler != null) {
                 ServerInfo currentServer = client.getCurrentServerEntry();
                 if (currentServer != null) {
-                    String serverAddress = currentServer.address;
-                    return server.equals(serverAddress);
+                    if (server == null)
+                    {
+                        return true;
+                    }
+                    else
+                    {
+                        String serverAddress = currentServer.address;
+                        return server.equals(serverAddress);
+                    }
                 }
             }
         }
@@ -431,7 +452,7 @@ public class ZencraftPrice implements ModInitializer {
                         }
                         else
                         {
-                            total += (itemPrices.get(toUpperCase(itemStack.getItem().toString()))) * itemStack.getCount();
+                            total += ((itemPrices.get(toUpperCase(itemStack.getItem().toString()))) + getEnchantementsPrice(itemStack))* itemStack.getCount();
                         }
                     }
                     inventory.set(slot, itemStack);
