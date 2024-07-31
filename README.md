@@ -1,5 +1,9 @@
 # Zenprice
 
+
+![Zenprice](https://cdn.modrinth.com/data/4pe390qp/cbc5ebbb052b8173a0c8d3c04663bcfd8096ab30.png)
+
+
 ## Ce mod est specifique au serveur :⠀[play.zencraft.fr](https://zencraft.fr/) 
 ## Ce mod nécessite **[Fabric API](https://modrinth.com/mod/fabric-api)** pour fonctionner !
 
