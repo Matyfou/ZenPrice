@@ -1,7 +1,7 @@
 # Zenprice
 
 
-![Zenprice](https://cdn.modrinth.com/data/4pe390qp/cbc5ebbb052b8173a0c8d3c04663bcfd8096ab30.png)
+<img src="https://cdn.modrinth.com/data/4pe390qp/cbc5ebbb052b8173a0c8d3c04663bcfd8096ab30.png" width="400" height="400">
 
 
 ## Ce mod est specifique au serveur :⠀[play.zencraft.fr](https://zencraft.fr/) 
