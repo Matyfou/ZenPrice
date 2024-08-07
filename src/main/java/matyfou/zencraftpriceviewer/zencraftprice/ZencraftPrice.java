@@ -4,6 +4,8 @@ import com.github.miachm.sods.Range;
 import com.github.miachm.sods.Sheet;
 import com.github.miachm.sods.SpreadSheet;
 
+import com.mojang.datafixers.TypeRewriteRule;
+import it.unimi.dsi.fastutil.objects.Object2IntMap;
 import matyfou.zencraftpriceviewer.ZenConfig;
 
 import me.shedaniel.autoconfig.AutoConfig;
@@ -18,6 +20,11 @@ import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.screen.ingame.ShulkerBoxScreen;
 import net.minecraft.client.network.ClientPlayNetworkHandler;
 import net.minecraft.client.network.ServerInfo;
+import net.minecraft.component.DataComponentTypes;
+import net.minecraft.component.type.ContainerComponent;
+import net.minecraft.component.type.ItemEnchantmentsComponent;
+import net.minecraft.component.type.LoreComponent;
+import net.minecraft.component.type.NbtComponent;
 import net.minecraft.enchantment.Enchantment;
 import net.minecraft.enchantment.EnchantmentHelper;
 import net.minecraft.item.BlockItem;
@@ -29,6 +36,9 @@ import net.minecraft.nbt.NbtElement;
 import net.minecraft.nbt.NbtList;
 import net.minecraft.nbt.NbtString;
 import net.minecraft.registry.Registries;
+import net.minecraft.registry.RegistryKey;
+import net.minecraft.registry.entry.RegistryEntry;
+import net.minecraft.registry.tag.EnchantmentTags;
 import net.minecraft.screen.ScreenHandler;
 import net.minecraft.screen.slot.Slot;
 import net.minecraft.text.Text;
@@ -58,6 +68,8 @@ public class ZencraftPrice implements ModInitializer {
 
     ZenConfig config;
 
+    boolean IsZenlauncher = false;
+
     private String CONFIG_DIR = (FabricLoader.getInstance().getConfigDir() + "\\Zenprice");
     private static final String DEFAULT_EXCEL_PATH = "table_des_prix.ods";
     private String CONFIG_EXCEL_PATH = CONFIG_DIR + "\\table_des_prix.ods";
@@ -74,6 +86,7 @@ public class ZencraftPrice implements ModInitializer {
         if(FabricLoader.getInstance().isModLoaded("zenclient"))
         {
             LOGGER.info("Zenlauncher detecter !");
+            IsZenlauncher = true;
         }
 
         if(config.excelAutoUpdate)
@@ -87,21 +100,312 @@ public class ZencraftPrice implements ModInitializer {
 
         loadPricesFromOds(CONFIG_EXCEL_PATH);
 
-        ItemTooltipCallback.EVENT.register((stack, context, lines) -> {
-            if(!config.serverOnlyOption || isConnectedToServer("play.zencraft.fr"))
+        ItemTooltipCallback.EVENT.register((stack, tooltipContext, tooltipType, lines) -> {
+            if(!config.serverOnlyOption || IsZenlauncher || isConnectedToServer("zencraft"))
             {
                 putTitles(stack, lines);
             }
         });
 
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
-            if(!config.serverOnlyOption || isConnectedToServer("play.zencraft.fr"))
+            if(!config.serverOnlyOption|| IsZenlauncher || isConnectedToServer("zencraft"))
             {
                 setChestName(client);
             }
         });
     }
 
+
+
+
+    private void putTitles(ItemStack stack, List<Text> lines)
+    {
+            String itemName = toUpperCase(stack.getItem().toString().substring(10)); // retirer le minecraft: au debut
+            double itemPrice = 0;
+            totalPrice = 0;
+
+            if(itemPrices.get(itemName) == null)
+            {
+                LOGGER.error("1Item : " + itemName + " pas trouver dans la liste !");
+            }
+            else
+            {
+                itemPrice = itemPrices.get(itemName);
+            }
+            if (itemPrice > 0)
+            {
+                // Verifier si l'item est une shulker
+                if (stack.getItem() instanceof BlockItem)
+                {
+                    BlockItem blockItem = (BlockItem) stack.getItem();
+                    if (blockItem.getBlock() instanceof ShulkerBoxBlock)
+                    {
+                        totalPrice = getShulkerTotal(stack);
+                        if (totalPrice > 0)
+                        {
+                            itemPrice = totalPrice;
+                        }
+                    }
+                }
+
+                // Ajouter le prix des enchantements
+                itemPrice += getEnchantementsPrice(stack);
+
+                // Arondir au deux decimal
+                itemPrice = Math.round(itemPrice * 100.0) / 100.0;
+
+                // Ne pas mettre de prix si c'est un item de collection/celeste
+                if(hasSpecificLore(stack, "Évènement de collection") || hasSpecificLore(stack, "Commun"))
+                {
+                    lines.add(Text.translatable("zenprice.priceNotFixed"));
+                }
+                // Mettre un prix si c'est DES items
+                else if(stack.getCount() > 1)
+                {
+                    lines.add(Text.of((config.priceText + " " + itemPrice + "$" + " (" + String.format("%.2f", (stack.getCount() * itemPrice)) + "$)")));
+                }
+                // Mettre un prix si c'est UN item
+                else
+                {
+                    lines.add(Text.of((config.priceText + " " + itemPrice + "$")));
+                }
+            }
+            else
+            {
+                lines.add(Text.translatable("zenprice.priceNotFound"));
+            }
+    }
+
+    private double getEnchantementsPrice(ItemStack stack)
+    {
+        double itemPrice = 0;
+        String[] enchantmentsArray = getEnchantmentsArray(stack);
+        // Si il a un enchantement
+        for (String enchant : enchantmentsArray)
+        {
+            if(itemPrices.get(enchant.toUpperCase()) != null)
+            {
+                itemPrice += itemPrices.get(enchant.toUpperCase());
+            }
+            else
+            {
+                LOGGER.error("Enchantement : " + enchant.toUpperCase() + " pas trouver !");
+            }
+        }
+
+        return (itemPrice);
+    }
+
+
+    public static String[] getEnchantmentsArray(ItemStack stack)
+    {
+        ItemEnchantmentsComponent enchantments;
+
+        if (stack.getItem() == Items.ENCHANTED_BOOK) {
+            enchantments = EnchantmentHelper.getEnchantments(stack);
+        }
+        else if(stack.hasEnchantments())
+        {
+            enchantments = stack.getEnchantments();
+        }
+        else
+        {
+            return new String[0];
+        }
+
+        List<String> enchantmentsList = new ArrayList<>();
+        for (RegistryEntry<Enchantment> entry : enchantments.getEnchantments()) {
+            int level = enchantments.getLevel(entry);
+            String enchantmentString = (entry.getIdAsString().substring(10) + "_" + level);
+            enchantmentsList.add(enchantmentString);
+        }
+        return enchantmentsList.toArray(new String[0]);
+    }
+
+    public static boolean isConnectedToServer(String server) {
+        MinecraftClient client = MinecraftClient.getInstance();
+        if (client != null) {
+            ClientPlayNetworkHandler networkHandler = client.getNetworkHandler();
+            if (networkHandler != null) {
+                ServerInfo currentServer = client.getCurrentServerEntry();
+                if (currentServer != null) {
+                    if (server == null)
+                    {
+                        return false;
+                    }
+                    else
+                    {
+                        String serverAddress = currentServer.address;
+                        return serverAddress.contains(server);
+                    }
+                }
+            }
+        }
+        return false;
+    }
+
+    private void setChestName(MinecraftClient client)
+    {
+        // Si c'est un coffre
+        if (client.player != null && client.currentScreen instanceof GenericContainerScreen) {
+            ScreenAccessor screen = (ScreenAccessor) client.currentScreen;
+            GenericContainerScreen containerScreen = (GenericContainerScreen) client.currentScreen;
+
+            String modifiedText = "?";
+
+            String originalText = containerScreen.getTitle().getString();
+
+            // Verifier si c'est bien un coffre (pour eviter de faire bugger le /metier)
+            // A CHANGER (je sais c'est de la merde ce que j'ai fais)
+            if((originalText.toLowerCase().contains("chest") || (originalText.toLowerCase().contains("coffre") || (originalText.toLowerCase().contains("tonneau") || (originalText.toLowerCase().contains("barrel"))))))
+            {
+                String add = " " + config.chestPriceText +  " ";
+
+                double chestPrice = getContainerMenuTotal(containerScreen.getScreenHandler());
+
+                // Faire un texte pour eviter de faire une boucle et un texte mega long
+                modifiedText = originalText.contains(add)
+                        ? originalText.substring(0, originalText.indexOf(add)) + add + String.format("%.2f", chestPrice) + "$"
+                        : originalText + add + String.format("%.2f", chestPrice) + "$";
+
+                screen.zencraftprice$setTitle(Text.of(modifiedText));
+            }
+        }
+        // Si c'est une shulker
+        else if(client.player != null && client.currentScreen instanceof ShulkerBoxScreen)
+        {
+            ScreenAccessor screen = (ScreenAccessor) client.currentScreen;
+            ShulkerBoxScreen shulkerScreen = (ShulkerBoxScreen) client.currentScreen;
+
+            String modifiedText = "?";
+
+            String originalText = shulkerScreen.getTitle().getString();
+            String add = " " + config.chestPriceText +  " ";
+
+            double chestPrice = getContainerMenuTotal(shulkerScreen.getScreenHandler());
+
+            // Faire un texte pour eviter de faire une boucle et un texte mega long
+            modifiedText = originalText.contains(add)
+                    ? originalText.substring(0, originalText.indexOf(add)) + add + String.format("%.2f", chestPrice) + "$"
+                    : originalText + add + String.format("%.2f", chestPrice) + "$";
+
+            screen.zencraftprice$setTitle(Text.of(modifiedText));
+        }
+    }
+
+
+    // Savoir le prix total dans un container
+    // "Oui c'est pas comme ca qu'on fait" : tg
+    private double getContainerMenuTotal(ScreenHandler screen) {
+        double total = 0.0;
+        double itemPrice = 0;
+
+        // Iterate through the slots in the GenericContainerScreen
+        for (Slot slot : screen.slots) {
+            int menuSize = (screen.slots.size()) - 36;
+            if (slot.hasStack() && slot.id < menuSize) {
+                ItemStack itemStack = slot.getStack();
+
+                // Check si c'est pas un item celeste
+                if (!hasSpecificLore(itemStack, "Évènement de collection") || hasSpecificLore(itemStack, "Commun")) {
+                    // Verifier si l'item est une shulker
+                    if (itemStack.getItem() instanceof BlockItem)
+                    {
+                        BlockItem blockItem = (BlockItem) itemStack.getItem();
+                        if (blockItem.toString().contains("shulker_box"))
+                        {
+                            totalPrice = getShulkerTotal(itemStack);
+                            if (totalPrice > 0)
+                            {
+                                itemPrice = totalPrice;
+                            }
+                            else
+                            {
+                                if(itemPrices.get(toUpperCase(itemStack.getItem().toString().substring(10))) == null)
+                                {
+                                    LOGGER.error("2Item : " + toUpperCase(itemStack.getItem().toString().substring(10)) + " pas trouver dans la liste !");
+                                }
+                                else
+                                {
+                                    itemPrice = itemPrices.get(toUpperCase(itemStack.getItem().toString().substring(10)));
+                                    itemPrice += getEnchantementsPrice(itemStack);
+                                }
+                            }
+                        }
+                        else
+                        {
+                            if(itemPrices.get(toUpperCase(itemStack.getItem().toString().substring(10))) == null)
+                            {
+                                LOGGER.error("3Item : " + itemStack.getItem().toString().substring(10) + " pas trouver dans la liste !");
+                            }
+                            else
+                            {
+                                itemPrice = itemPrices.get(toUpperCase(itemStack.getItem().toString().substring(10)));
+                                itemPrice += getEnchantementsPrice(itemStack);
+                            }
+                        }
+                    }
+                    else
+                    {
+                        if(itemPrices.get(toUpperCase(itemStack.getItem().toString().substring(10))) == null)
+                        {
+                            LOGGER.error("4Item : " + itemStack.getItem().toString().substring(10) + " pas trouver dans la liste !");
+                        }
+                        else
+                        {
+                            itemPrice = itemPrices.get(toUpperCase(itemStack.getItem().toString().substring(10)));
+                            itemPrice += getEnchantementsPrice(itemStack);
+                        }
+                    }
+                    total += itemPrice * itemStack.getCount();
+                }
+            }
+        }
+        return total;
+    }
+
+
+    // Savoir le prix total d'une shulker dictement en forme item
+    private double getShulkerTotal(ItemStack stack)
+    {
+        double total = 0;
+
+        if (stack.getOrDefault(DataComponentTypes.CONTAINER, ContainerComponent.DEFAULT) != null) {
+            ContainerComponent container = stack.getOrDefault(DataComponentTypes.CONTAINER, ContainerComponent.DEFAULT);
+            List<ItemStack> list = container.stream().toList();
+            for (int i = 0; i < list.size(); i++)
+            {
+                ItemStack itemStack = list.get(i);
+                if (!hasSpecificLore(itemStack, "Évènement de collection") || hasSpecificLore(stack, "Commun"))
+                {
+                    if ((itemPrices.get(toUpperCase(itemStack.getItem().toString().substring(10)))) == null)
+                    {
+                        LOGGER.error("5Item : " + itemStack.getItem().toString().substring(10) + " pas trouver dans la liste !");
+                    }
+                    else
+                    {
+                        total += ((itemPrices.get(toUpperCase(itemStack.getItem().toString().substring(10)))) + getEnchantementsPrice(itemStack)) * itemStack.getCount();
+                    }
+                }
+            }
+        }
+        return total;
+    }
+
+    public static boolean hasSpecificLore(ItemStack stack, String targetLore) {
+        LoreComponent lore = stack.get(DataComponentTypes.LORE);
+        if(lore != null)
+        {
+            List<Text> lines = lore.lines();
+            for (int i = 0; i < lines.size(); ++i) {
+                String s = lines.get(i).getString();
+                if (s.contains(targetLore)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
 
     private String GITHUB_EXCEL_RAW_URL = "https://raw.githubusercontent.com/Matyfou/ZenpriceTDP/main/table_des_prix.ods";
     private String GITHUB_API_URL = "https://api.github.com/repos/Matyfou/ZenpriceTDP/contents/table_des_prix.ods";
@@ -161,322 +465,6 @@ public class ZencraftPrice implements ModInitializer {
             LOGGER.error("Erreur lors de la mise a jour du fichier Excel depuis GitHub", e);
             ExcelFileGet();
         }
-    }
-
-    private void putTitles(ItemStack stack, List<Text> lines)
-    {
-            String itemName = toUpperCase(stack.getItem().toString());
-            double itemPrice = 0;
-            totalPrice = 0;
-
-            if(itemPrices.get(itemName) == null)
-            {
-                LOGGER.error("Item : " + itemName + " pas trouver dans la liste !");
-            }
-            else
-            {
-                itemPrice = itemPrices.get(itemName);
-            }
-            if (itemPrice > 0)
-            {
-                // Verifier si l'item est une shulker
-                if (stack.getItem() instanceof BlockItem)
-                {
-                    BlockItem blockItem = (BlockItem) stack.getItem();
-                    if (blockItem.getBlock() instanceof ShulkerBoxBlock)
-                    {
-                        totalPrice = getShulkerTotal(stack);
-                        if (totalPrice > 0)
-                        {
-                            itemPrice = totalPrice;
-                        }
-                    }
-                }
-
-                // Ajouter le prix des enchantements
-                itemPrice += getEnchantementsPrice(stack);
-
-                // Arondir au deux decimal
-                itemPrice = Math.round(itemPrice * 100.0) / 100.0;
-
-                // Ne pas mettre de prix si c'est un item de collection/celeste
-                if(hasSpecificLore(stack, "Évènement de collection") || hasSpecificLore(stack, "Commun"))
-                {
-                    lines.add(Text.translatable("zenprice.priceNotFixed"));
-                }
-                // Mettre un prix si c'est DES items
-                else if(stack.getCount() > 1)
-                {
-                    lines.add(Text.of((config.priceText + " " + itemPrice + "$" + " (" + String.format("%.2f", (stack.getCount() * itemPrice)) + "$)")));
-                }
-                // Mettre un prix si c'est UN item
-                else
-                {
-                    lines.add(Text.of((config.priceText + " " + itemPrice + "$")));
-                }
-            }
-            else
-            {
-                lines.add(Text.translatable("zenprice.priceNotFound"));
-            }
-    }
-
-    private double getEnchantementsPrice(ItemStack stack)
-    {
-        double itemPrice = 0;
-        // Si il a un enchantement
-        if(!EnchantmentHelper.get(stack).isEmpty())
-        {
-            // Récupérer les enchantements des livres enchantés
-            if (stack.getItem() == Items.ENCHANTED_BOOK) {
-                NbtList enchantments = EnchantedBookItem.getEnchantmentNbt(stack);
-                for (NbtElement enchantmentElement : enchantments) {
-                    if (enchantmentElement instanceof NbtCompound) {
-                        NbtCompound enchantmentCompound = (NbtCompound) enchantmentElement;
-                        Identifier id = Identifier.tryParse(enchantmentCompound.getString("id"));
-                        int level = enchantmentCompound.getInt("lvl");
-                        if (id != null) {
-                            //enchantmentsList.add(id.getPath() + "_" + level);
-                            if(itemPrices.get((id.getPath().toUpperCase() + "_" + level)) != null)
-                            {
-                                itemPrice += itemPrices.get((id.getPath().toUpperCase() + "_" + level));
-                            }
-                        }
-                    }
-                }
-                itemPrice -= 225.86;
-            }
-            for (String enchantment : getEnchantmentsArray(stack))
-            {
-                if(!(enchantment == null)) {
-                    if(itemPrices.get(enchantment.toUpperCase()) != null)
-                    {
-                        itemPrice += itemPrices.get(enchantment.toUpperCase());
-                    }
-                    else
-                    {
-                        LOGGER.error("L'enchantement : " + enchantment + " pas trouver !");
-                    }
-                }
-            }
-        }
-        return (itemPrice);
-    }
-
-    public static String[] getEnchantmentsArray(ItemStack itemStack) {
-        // Vérifier si l'item a des enchantements
-        if (!itemStack.hasEnchantments()) {
-            return new String[0];
-        }
-
-        // Récupérer les enchantements de l'item
-        Map<Enchantment, Integer> enchantments = EnchantmentHelper.get(itemStack);
-
-        // Construire la liste des enchantements
-        List<String> enchantmentsList = new ArrayList<>();
-        for (Map.Entry<Enchantment, Integer> entry : enchantments.entrySet()) {
-            String enchantmentString = getEnchantmentId(entry.getKey()) + "_" + entry.getValue();
-            enchantmentsList.add(enchantmentString);
-        }
-
-        // Convertir la liste en tableau
-        return enchantmentsList.toArray(new String[0]);
-    }
-
-    private static String getEnchantmentId(Enchantment enchantment) {
-        Identifier id = Registries.ENCHANTMENT.getId(enchantment);
-        return id == null ? "unknown" : id.getPath();
-    }
-
-    public static boolean isConnectedToServer(String server) {
-        MinecraftClient client = MinecraftClient.getInstance();
-        if (client != null) {
-            ClientPlayNetworkHandler networkHandler = client.getNetworkHandler();
-            if (networkHandler != null) {
-                ServerInfo currentServer = client.getCurrentServerEntry();
-                if (currentServer != null) {
-                    if (server == null)
-                    {
-                        return true;
-                    }
-                    else
-                    {
-                        String serverAddress = currentServer.address;
-                        return server.equals(serverAddress);
-                    }
-                }
-            }
-        }
-        return false;
-    }
-
-    private void setChestName(MinecraftClient client)
-    {
-        // Si c'est un coffre
-        if (client.player != null && client.currentScreen instanceof GenericContainerScreen) {
-            ScreenAccessor screen = (ScreenAccessor) client.currentScreen;
-            GenericContainerScreen containerScreen = (GenericContainerScreen) client.currentScreen;
-
-            String modifiedText = "?";
-
-            String originalText = containerScreen.getTitle().getString();
-
-            // Verifier si c'est bien un coffre (pour eviter de faire bugger le /metier)
-            // A CHANGER (je sais c'est de la merde ce que j'ai fais)
-            if((originalText.toLowerCase().contains("chest") || (originalText.toLowerCase().contains("coffre") || (originalText.toLowerCase().contains("tonneau") || (originalText.toLowerCase().contains("barrel"))))))
-            {
-                String add = " " + config.chestPriceText +  " ";
-
-                double chestPrice = getContainerMenuTotal(containerScreen.getScreenHandler());
-
-                // Faire un texte pour eviter de faire une boucle et un texte mega long
-                modifiedText = originalText.contains(add)
-                        ? originalText.substring(0, originalText.indexOf(add)) + add + String.format("%.2f", chestPrice) + "$"
-                        : originalText + add + String.format("%.2f", chestPrice) + "$";
-
-                screen.zencraftprice$setTitle(Text.of(modifiedText));
-            }
-        }
-        // Si c'est une shulker
-        else if(client.player != null && client.currentScreen instanceof ShulkerBoxScreen)
-        {
-            ScreenAccessor screen = (ScreenAccessor) client.currentScreen;
-            ShulkerBoxScreen shulkerScreen = (ShulkerBoxScreen) client.currentScreen;
-
-            String modifiedText = "?";
-
-            String originalText = shulkerScreen.getTitle().getString();
-            String add = " " + config.chestPriceText +  " ";
-
-            double chestPrice = getContainerMenuTotal(shulkerScreen.getScreenHandler());
-
-            // Faire un texte pour eviter de faire une boucle et un texte mega long
-            modifiedText = originalText.contains(add)
-                    ? originalText.substring(0, originalText.indexOf(add)) + add + String.format("%.2f", chestPrice) + "$"
-                    : originalText + add + String.format("%.2f", chestPrice) + "$";
-
-            screen.zencraftprice$setTitle(Text.of(modifiedText));
-        }
-    }
-
-
-    // Savoir le prix total dans un container
-    // "Oui c'est pas comme ca qu'on fais" : tg
-    private double getContainerMenuTotal(ScreenHandler screen) {
-        double total = 0.0;
-        double itemPrice = 0;
-
-        // Iterate through the slots in the GenericContainerScreen
-        for (Slot slot : screen.slots) {
-            int menuSize = (screen.slots.size()) - 36;
-            if (slot.hasStack() && slot.id < menuSize) {
-                ItemStack itemStack = slot.getStack();
-
-                // Check si c'est pas un item celeste
-                if (!hasSpecificLore(itemStack, "Évènement de collection") || hasSpecificLore(itemStack, "Commun")) {
-                    // Verifier si l'item est une shulker
-                    if (itemStack.getItem() instanceof BlockItem)
-                    {
-                        BlockItem blockItem = (BlockItem) itemStack.getItem();
-                        if (blockItem.getBlock() instanceof ShulkerBoxBlock)
-                        {
-                            totalPrice = getShulkerTotal(itemStack);
-                            if (totalPrice > 0)
-                            {
-                                itemPrice = totalPrice;
-                            }
-                            else
-                            {
-                                if(itemPrices.get(toUpperCase(itemStack.getItem().toString())) == null)
-                                {
-                                    LOGGER.error("Item : " + itemStack.getItem().toString() + " pas trouver dans la liste !");
-                                }
-                                else
-                                {
-                                    itemPrice = itemPrices.get(toUpperCase(itemStack.getItem().toString()));
-                                    itemPrice += getEnchantementsPrice(itemStack);
-                                }
-                            }
-                        }
-                        else
-                        {
-                            if(itemPrices.get(toUpperCase(itemStack.getItem().toString())) == null)
-                            {
-                                LOGGER.error("Item : " + itemStack.getItem().toString() + " pas trouver dans la liste !");
-                            }
-                            else
-                            {
-                                itemPrice = itemPrices.get(toUpperCase(itemStack.getItem().toString()));
-                                itemPrice += getEnchantementsPrice(itemStack);
-                            }
-                        }
-                    }
-                    else
-                    {
-                        if(itemPrices.get(toUpperCase(itemStack.getItem().toString())) == null)
-                        {
-                            LOGGER.error("Item : " + itemStack.getItem().toString() + " pas trouver dans la liste !");
-                        }
-                        else
-                        {
-                            itemPrice = itemPrices.get(toUpperCase(itemStack.getItem().toString()));
-                            itemPrice += getEnchantementsPrice(itemStack);
-                        }
-                    }
-                    total += itemPrice * itemStack.getCount();
-                }
-            }
-        }
-        return total;
-    }
-
-
-    // Savoir le prix total d'une shulker dictement en forme item
-    private double getShulkerTotal(ItemStack stack)
-    {
-        double total = 0;
-        NbtCompound blockEntityTag = stack.getSubNbt("BlockEntityTag");
-        if (blockEntityTag != null) {
-            NbtList items = blockEntityTag.getList("Items", 10);
-            DefaultedList<ItemStack> inventory = DefaultedList.ofSize(27, ItemStack.EMPTY);
-            for (int i = 0; i < items.size(); i++) {
-                NbtCompound itemTag = items.getCompound(i);
-                int slot = itemTag.getByte("Slot") & 255;
-                if (slot >= 0 && slot < inventory.size()) {
-                    ItemStack itemStack = ItemStack.fromNbt(itemTag);
-                    if(!hasSpecificLore(itemStack, "Évènement de collection") || hasSpecificLore(stack, "Commun"))
-                    {
-                        if((itemPrices.get(toUpperCase(itemStack.getItem().toString()))) == null)
-                        {
-                            LOGGER.error("Item : " + itemStack.getItem().toString() + " pas trouver dans la liste !");
-                        }
-                        else
-                        {
-                            total += ((itemPrices.get(toUpperCase(itemStack.getItem().toString()))) + getEnchantementsPrice(itemStack))* itemStack.getCount();
-                        }
-                    }
-                    inventory.set(slot, itemStack);
-                }
-            }
-        }
-        return total;
-    }
-
-
-    private static boolean hasSpecificLore(ItemStack stack, String targetLore) {
-        if (stack.hasNbt()) {
-            NbtCompound display = stack.getSubNbt("display");
-            if (display != null) {
-                NbtList lore = display.getList("Lore", NbtString.STRING_TYPE);
-                for (int i = 0; i < lore.size(); i++) {
-                    NbtString loreEntry = NbtString.of(lore.getString(i));
-                    if (loreEntry.asString().contains(targetLore)) {
-                        return true;
-                    }
-                }
-            }
-        }
-        return false;
     }
 
     // Creer le fichier excel par default si il existe pas
